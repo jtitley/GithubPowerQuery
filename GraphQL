@@ -1,0 +1,26 @@
+let
+    vUrl = "https://api.github.com/graphql",
+    vHeaders =[
+			#"Method"="POST",
+			#"Content-Type"="application/json",
+			#"Authorization"="Bearer " & AccessToken
+		],
+    // Notice the quote escaping here
+    // Source: https://github.com/github/platform-samples/issues/168
+    vContent=Text.ToBinary("{""query"": ""{   organization(login: \""myorganization\"") { samlIdentityProvider {  externalIdentities(first: 100) { edges { node { guid samlIdentity { nameId } user { login}}}}}   }}""}"),
+    Source = Web.Contents(vUrl,	[Headers=vHeaders, Content=vContent]),
+    #"JSON" = Json.Document(Source),
+    data = JSON[data],
+    organization = data[organization],
+    samlIdentityProvider = organization[samlIdentityProvider],
+    externalIdentities = samlIdentityProvider[externalIdentities],
+    edges = externalIdentities[edges],
+    #"Converted to Table" = Table.FromList(edges, Splitter.SplitByNothing(), null, null, ExtraValues.Error),
+    #"Expanded Column1" = Table.ExpandRecordColumn(#"Converted to Table", "Column1", {"node"}, {"Column1.node"}),
+    #"Expanded Column1.node" = Table.ExpandRecordColumn(#"Expanded Column1", "Column1.node", {"guid", "samlIdentity", "user"}, {"Column1.node.guid", "Column1.node.samlIdentity", "Column1.node.user"}),
+    #"Expanded Column1.node.samlIdentity" = Table.ExpandRecordColumn(#"Expanded Column1.node", "Column1.node.samlIdentity", {"nameId"}, {"Column1.node.samlIdentity.nameId"}),
+    #"Expanded Column1.node.user" = Table.ExpandRecordColumn(#"Expanded Column1.node.samlIdentity", "Column1.node.user", {"login"}, {"Column1.node.user.login"}),
+    #"Removed Columns" = Table.RemoveColumns(#"Expanded Column1.node.user",{"Column1.node.guid"}),
+    #"Renamed Columns" = Table.RenameColumns(#"Removed Columns",{{"Column1.node.samlIdentity.nameId", "SAML Identity"}, {"Column1.node.user.login", "GitHub Login"}})
+in
+    #"Renamed Columns"
