@@ -11,3 +11,5 @@ Create two parameters called AccessToken and AccessUser.
 Fill them with your account name and an AccessToken with the following permissions:
 
 admin:org, public_repo, read:discussion, read:enterprise, read:gpg_key, read:public_key, read:repo_hook, repo:invite, repo:status, repo_deployment, user
+
+The main query references the GraphQL query, so make sure to rename that reference as well.
