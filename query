@@ -1,0 +1,12 @@
+let
+    options = [Headers =[#"Authorization"="Basic " & Binary.ToText(Text.ToBinary(AccessUser & ":" & AccessToken), BinaryEncoding.Base64)]],   
+    Source = Json.Document(Web.Contents("https://api.github.com/orgs/myorganization/members?page=1&per_page=100", options)),
+    #"Converted to Table" = Table.Combine({Table.FromList(Source, Splitter.SplitByNothing(), null, null, ExtraValues.Error)}),
+    #"Expanded Column1" = Table.ExpandRecordColumn(#"Converted to Table", "Column1", {"login", "id", "node_id", "avatar_url", "gravatar_id", "url", "html_url", "followers_url", "following_url", "gists_url", "starred_url", "subscriptions_url", "organizations_url", "repos_url", "events_url", "received_events_url", "type", "site_admin"}, {"Column1.login", "Column1.id", "Column1.node_id", "Column1.avatar_url", "Column1.gravatar_id", "Column1.url", "Column1.html_url", "Column1.followers_url", "Column1.following_url", "Column1.gists_url", "Column1.starred_url", "Column1.subscriptions_url", "Column1.organizations_url", "Column1.repos_url", "Column1.events_url", "Column1.received_events_url", "Column1.type", "Column1.site_admin"}),
+    #"Removed Columns" = Table.RemoveColumns(#"Expanded Column1",{"Column1.node_id", "Column1.avatar_url", "Column1.gravatar_id", "Column1.html_url", "Column1.followers_url", "Column1.following_url", "Column1.gists_url", "Column1.starred_url", "Column1.subscriptions_url", "Column1.organizations_url", "Column1.repos_url", "Column1.events_url", "Column1.received_events_url", "Column1.site_admin", "Column1.type"}),
+    #"Renamed Columns" = Table.RenameColumns(#"Removed Columns",{{"Column1.url", "URL"}, {"Column1.id", "ID"}, {"Column1.login", "Login"}}),
+    #"Merged Queries" = Table.NestedJoin(#"Renamed Columns", {"Login"}, GitHubCombinedEmail, {"GitHub Login"}, "GraphQL", JoinKind.LeftOuter),
+    #"Expanded GraphQL1" = Table.ExpandTableColumn(#"Merged Queries", "GraphQL", {"Email"}, {"GraphQL.Email"}),
+    #"Renamed Columns2" = Table.RenameColumns(#"Expanded GraphQL1",{{"GraphQL.Email", "Email"}})
+in
+    #"Renamed Columns2"
