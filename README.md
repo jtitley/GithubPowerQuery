@@ -1,7 +1,7 @@
 # GithubPowerQuery
 Repository with Power Queries for Github Reporting
 
-This repo contains queries that you can use in PowerBI and Excel Power Query for fetching report from GitHub.
+This repo contains queries that you can use in PowerBI and Excel Power Query for fetching report from GitHub. One of the big problems with Github is the lack of reporting for managing an Enterprise. This can be used in excel to pull data on users in an organisation, including email address.
 
 The queries are a combination of GraphQL and apis
 
