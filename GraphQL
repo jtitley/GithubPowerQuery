@@ -1,26 +1,43 @@
+//Source: https://gist.github.com/petrsvihlik/cc34a6cf1882d515139c5b27f37cf99e
 let
-    vUrl = "https://api.github.com/graphql",
-    vHeaders =[
-			#"Method"="POST",
-			#"Content-Type"="application/json",
-			#"Authorization"="Bearer " & AccessToken
-		],
-    // Notice the quote escaping here
-    // Source: https://github.com/github/platform-samples/issues/168
-    vContent=Text.ToBinary("{""query"": ""{   organization(login: \""myorganization\"") { samlIdentityProvider {  externalIdentities(first: 100) { edges { node { guid samlIdentity { nameId } user { login}}}}}   }}""}"),
-    Source = Web.Contents(vUrl,	[Headers=vHeaders, Content=vContent]),
-    #"JSON" = Json.Document(Source),
-    data = JSON[data],
-    organization = data[organization],
-    samlIdentityProvider = organization[samlIdentityProvider],
-    externalIdentities = samlIdentityProvider[externalIdentities],
-    edges = externalIdentities[edges],
-    #"Converted to Table" = Table.FromList(edges, Splitter.SplitByNothing(), null, null, ExtraValues.Error),
-    #"Expanded Column1" = Table.ExpandRecordColumn(#"Converted to Table", "Column1", {"node"}, {"Column1.node"}),
-    #"Expanded Column1.node" = Table.ExpandRecordColumn(#"Expanded Column1", "Column1.node", {"guid", "samlIdentity", "user"}, {"Column1.node.guid", "Column1.node.samlIdentity", "Column1.node.user"}),
+	FnGetOnePage = (cursor) =>
+	let		
+		Source = Json.Document(Web.Contents(
+		"https://api.github.com/graphql",
+		[
+			Headers=[
+				#"Method"="POST",
+				#"Content-Type"="application/json",
+				#"Authorization"="Bearer " & AccessToken
+			],
+		Content=Text.ToBinary(Text.Replace("{""query"": ""query($cursor: String) { organization(login: \""myorganization\"") { samlIdentityProvider { externalIdentities(first: 100, after:$cursor) { totalCount edges { node { guid samlIdentity { nameId } user { login } } } pageInfo { endCursor hasNextPage } } } }}""}", "($cursor: String)", "($cursor: String" & cursor & ")"))
+		]
+		)),
+		data = Source[data],
+		organization = data[organization],
+		samlIdentityProvider = organization[samlIdentityProvider],
+		externalIdentities = samlIdentityProvider[externalIdentities],
+		edges = externalIdentities[edges],
+		pageInfo = externalIdentities[pageInfo],
+		hasNextPage = pageInfo[hasNextPage],
+		endcursor = pageInfo[endCursor],
+		res = [Data=edges, Cursor=endcursor, HasNext=hasNextPage]
+	in 
+		res,
+	GeneratedList =
+		List.Generate(
+			()=>[res = FnGetOnePage("")],
+			each Comparer.Equals(Comparer.FromCulture("en-us"), List.Count([res][Data]) > 0, true),
+			each [res = FnGetOnePage("=\""" & [res][Cursor] & "\""")],
+			each [res][Data] 
+		),
+    #"Converted to Table" = Table.FromList(GeneratedList, Splitter.SplitByNothing(), null, null, ExtraValues.Error),
+    #"Expanded Column1" = Table.ExpandListColumn(#"Converted to Table", "Column1"),
+    #"Expanded Column2" = Table.ExpandRecordColumn(#"Expanded Column1", "Column1", {"node"}, {"Column1.node"}),
+    #"Expanded Column1.node" = Table.ExpandRecordColumn(#"Expanded Column2", "Column1.node", {"samlIdentity", "user"}, {"Column1.node.samlIdentity", "Column1.node.user"}),
     #"Expanded Column1.node.samlIdentity" = Table.ExpandRecordColumn(#"Expanded Column1.node", "Column1.node.samlIdentity", {"nameId"}, {"Column1.node.samlIdentity.nameId"}),
     #"Expanded Column1.node.user" = Table.ExpandRecordColumn(#"Expanded Column1.node.samlIdentity", "Column1.node.user", {"login"}, {"Column1.node.user.login"}),
-    #"Removed Columns" = Table.RemoveColumns(#"Expanded Column1.node.user",{"Column1.node.guid"}),
-    #"Renamed Columns" = Table.RenameColumns(#"Removed Columns",{{"Column1.node.samlIdentity.nameId", "SAML Identity"}, {"Column1.node.user.login", "GitHub Login"}})
+    #"Filtered Rows" = Table.SelectRows(#"Expanded Column1.node.user", each [Column1.node.user.login] <> null and [Column1.node.user.login] <> ""),
+    #"Renamed Columns" = Table.RenameColumns(#"Filtered Rows",{{"Column1.node.samlIdentity.nameId", "SAML Identity"}, {"Column1.node.user.login", "GitHub Login"}})
 in
     #"Renamed Columns"
