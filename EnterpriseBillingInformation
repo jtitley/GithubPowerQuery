@@ -1,0 +1,18 @@
+let
+    vUrl = "https://api.github.com/graphql",
+    vHeaders =[
+			#"Method"="POST",
+			#"Content-Type"="application/json",
+			#"Authorization"="Bearer " & AccessToken
+		],
+    // Notice the quote escaping here
+    // Source: https://github.com/github/platform-samples/issues/168
+vContent=Text.ToBinary("{""query"": ""{   enterprise(slug: \""enterprisename\"") { billingInfo {allLicensableUsersCount,assetPacks,bandwidthQuota,bandwidthUsage,bandwidthUsagePercentage,storageQuota,storageUsage,storageUsagePercentage,totalAvailableLicenses,totalLicenses}   }}""}"),
+    Source = Web.Contents(vUrl,	[Headers=vHeaders, Content=vContent]),
+    #"JSON" = Json.Document(Source),
+    data = JSON[data],
+    enterprise = data[enterprise],
+    billingInfo = enterprise[billingInfo],
+    #"Converted to Table" = Record.ToTable(billingInfo)
+in
+    #"Converted to Table"
